@@ -125,14 +125,7 @@ def make_annotations_for_dir(target):
 
     return report
 
-
-def main():
-    if len(sys.argv) != 3:
-        print("Usage: codereview.py <apworld_path> <output_dir>")
-        sys.exit(1)
-
-    apworld_path = sys.argv[1]
-    output_dir = sys.argv[2]
+def lint(apworld_path, output_dir):
     apworld_name = Path(apworld_path).stem
     with tempfile.TemporaryDirectory() as dst, open(apworld_path, "rb") as fd:
         zipfile.ZipFile(fd).extractall(dst)
@@ -140,6 +133,12 @@ def main():
 
     with open(os.path.join(output_dir, f"{apworld_name}.aplint"), "w") as fd:
         fd.write(report.to_json())
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: codereview.py <apworld_path> <output_dir>")
+        sys.exit(1)
+    lint(sys.argv[1], sys.argv[2])
 
 if __name__ == "__main__":
     main()
