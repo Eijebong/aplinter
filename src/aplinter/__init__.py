@@ -42,6 +42,7 @@ class AnnotationType(enum.Enum):
     TYPE_CONTENT_MISMATCH = 0
     FILE_TYPE = 1
     BANDIT = 2
+    SUS_STRING = 3
 
     def to_json(self):
         return self.value
@@ -90,10 +91,19 @@ def make_file_lint_annotations_for_file(file_path):
         with open(file_path, "rb") as fd:
             try:
                 content = fd.read().decode('utf-8')
-                for sus_string in ('__import__', ):
-                    # TODO: Find the line number and col_start col_end
-                    if sus_string in content:
-                        yield ReviewAnnotation(Severity.VERY_HIGH, AnnotationType.SUS_STRING, f"Found suspicious string in file: {sus_string}")
+                lines = content.splitlines()
+                for line_num, line in enumerate(lines, 1):
+                    for sus_string in ('__import__', ):
+                        col_start = line.find(sus_string)
+                        while col_start != -1:
+                            col_end = col_start + len(sus_string)
+                            annotation = ReviewAnnotation(Severity.VERY_HIGH, AnnotationType.SUS_STRING, f"Found suspicious string in file: {sus_string}")
+                            annotation.line = line_num
+                            annotation.col_start = col_start
+                            annotation.col_end = col_end
+                            yield annotation
+                            # Look for more occurrences of the same string on the same line
+                            col_start = line.find(sus_string, col_end)
             except UnicodeDecodeError:
                 yield ReviewAnnotation(Severity.CRITICAL, AnnotationType.TYPE_CONTENT_MISMATCH, "The file should be a text file but isn't")
 

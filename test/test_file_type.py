@@ -46,4 +46,30 @@ def test_forbidden_binary_for_type(ext, should_annotate):
     )
 )
 def test_sus_strings(ext):
-    pass
+    test_content = """line 1 normal content
+line 2 has __import__ here
+line 3 normal
+line 4 with __import__ at start
+line 5 has multiple __import__ and __import__ occurrences"""
+
+    with tempfile.NamedTemporaryFile("w", suffix=ext, delete=False) as fd:
+        fd.write(test_content)
+        fd.flush()
+
+        annotations = get_annotation_for_type(make_file_lint_annotations_for_file(fd.name), AnnotationType.SUS_STRING)
+
+        assert len(annotations) == 4
+
+        expected_positions = [
+            (2, 11, 21),  # line 2, col 11-21
+            (4, 12, 22),  # line 4, col 12-22
+            (5, 20, 30),  # line 5, first occurrence col 20-30
+            (5, 35, 45),  # line 5, second occurrence col 35-45
+        ]
+
+        actual_positions = [(ann.line, ann.col_start, ann.col_end) for ann in annotations]
+
+        assert actual_positions == expected_positions
+
+        for ann in annotations:
+            assert ann.desc == "Found suspicious string in file: __import__"
