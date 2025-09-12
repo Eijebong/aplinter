@@ -81,7 +81,7 @@ def make_bandit_annotations_for_file(file_path):
         yield annotation
 
 
-MUST_BE_TEXT_EXT = (".py", ".json", ".yaml", ".txt", ".md", "")
+MUST_BE_TEXT_EXT = (".py", ".json", ".yml", ".yaml", ".txt", ".md", "")
 WARN_EXT = (".so", ".pyd", ".dll", ".exe", ".apworld")
 
 def make_file_lint_annotations_for_file(file_path):
