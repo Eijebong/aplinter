@@ -93,7 +93,7 @@ def make_file_lint_annotations_for_file(file_path):
                 content = fd.read().decode('utf-8')
                 lines = content.splitlines()
                 for line_num, line in enumerate(lines, 1):
-                    for sus_string in ('__import__', ):
+                    for sus_string in ('__import__', 'nosec', '# nosec', '#nosec', 'bandit:', '# bandit:', '#bandit:'):
                         col_start = line.find(sus_string)
                         while col_start != -1:
                             col_end = col_start + len(sus_string)
