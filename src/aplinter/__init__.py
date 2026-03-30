@@ -2,12 +2,14 @@ import sys
 import zipfile
 import tempfile
 import os
-import enum
 from bandit.core import manager
 from bandit.core import config
 from collections import defaultdict
 from pathlib import Path
 import json
+
+from aplinter.types import Severity, AnnotationType, ReviewAnnotation
+from aplinter.ast_checks import make_ast_annotations_for_file
 
 
 class ReviewReport:
@@ -26,44 +28,7 @@ class ReviewReport:
         return json.dumps(self._files, default=_default)
 
 
-class Severity(enum.Enum):
-    CRITICAL = 60
-    VERY_HIGH = 50
-    HIGH = 40
-    MEDIUM = 30
-    LOW = 20
-    VERY_LOW = 10
-
-    def to_json(self):
-        return self.value
-
-
-class AnnotationType(enum.Enum):
-    TYPE_CONTENT_MISMATCH = 0
-    FILE_TYPE = 1
-    BANDIT = 2
-    SUS_STRING = 3
-
-    def to_json(self):
-        return self.value
-
-
-class ReviewAnnotation:
-    def __init__(self, severity, ty, desc):
-        self.ty = ty
-        self.desc = desc
-        self.severity = severity
-        self.line = None
-        self.col_start = None
-        self.col_end = None
-        self.extra = None
-
-    def to_json(self):
-        return self.__dict__
-
-
 def map_bandit_severity(issue):
-    print(issue.__dict__)
     return Severity.LOW
 
 def make_bandit_annotations_for_file(file_path):
@@ -73,11 +38,9 @@ def make_bandit_annotations_for_file(file_path):
 
     for issue in b_mgr.get_issue_list():
         severity = map_bandit_severity(issue)
-        annotation = ReviewAnnotation(severity, AnnotationType.BANDIT, issue.text)
-        annotation.line = issue.lineno
-        annotation.col_start = issue.col_offset
-        annotation.col_end = issue.end_col_offset
-        annotation.extra = issue.test_id
+        annotation = ReviewAnnotation(severity, AnnotationType.BANDIT, issue.text,
+                                      line=issue.lineno, col_start=issue.col_offset,
+                                      col_end=issue.end_col_offset, extra=issue.test_id)
         yield annotation
 
 
@@ -93,15 +56,13 @@ def make_file_lint_annotations_for_file(file_path):
                 content = fd.read().decode('utf-8')
                 lines = content.splitlines()
                 for line_num, line in enumerate(lines, 1):
-                    for sus_string in ('__import__', 'nosec', '# nosec', '#nosec', 'bandit:', '# bandit:', '#bandit:'):
+                    for sus_string in ('__import__', '__builtins__', '__subclasses__', 'nosec', '# nosec', '#nosec', 'bandit:', '# bandit:', '#bandit:'):
                         col_start = line.find(sus_string)
                         while col_start != -1:
                             col_end = col_start + len(sus_string)
-                            annotation = ReviewAnnotation(Severity.VERY_HIGH, AnnotationType.SUS_STRING, f"Found suspicious string in file: {sus_string}")
-                            annotation.line = line_num
-                            annotation.col_start = col_start
-                            annotation.col_end = col_end
-                            yield annotation
+                            yield ReviewAnnotation(Severity.VERY_HIGH, AnnotationType.SUS_STRING,
+                                                   f"Found suspicious string in file: {sus_string}",
+                                                   line=line_num, col_start=col_start, col_end=col_end)
                             # Look for more occurrences of the same string on the same line
                             col_start = line.find(sus_string, col_end)
             except UnicodeDecodeError:
@@ -119,6 +80,7 @@ def make_file_lint_annotations_for_file(file_path):
 def get_annotations_for_file(file_path):
     yield from make_bandit_annotations_for_file(file_path)
     yield from make_file_lint_annotations_for_file(file_path)
+    yield from make_ast_annotations_for_file(file_path)
 
 
 def make_annotations_for_dir(target):
